@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/bchaber/hattivatti/main/logo.svg?token=AKYNLAABCW5OXYQKDCWCB33BZXENO" height="256px" alt="A streamer. Or a hattifattener. Maybe a D2Q6 stencil?"/>
+  <img src="https://raw.githubusercontent.com/bchaber/hattivatti/blob/main/logo.svg" height="256px" alt="A streamer. Or a hattifattener. Maybe a D2Q6 stencil?"/>
   <h1>hattivatti</h1>
 </p>
 
