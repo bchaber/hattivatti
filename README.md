@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="https://github.com/bchaber/hattivatii/blob/main/logo.svg" width="256px" alt="A streamer. Or a hattifattener. Maybe a D2Q6 stencil?"/>
-  <h1>hatti vatti</h1>
+  <img src="https://raw.githubusercontent.com/bchaber/hattivatti/main/logo.svg?token=AKYNLAABCW5OXYQKDCWCB33BZXENO" height="256px" alt="A streamer. Or a hattifattener. Maybe a D2Q6 stencil?"/>
+  <h1>hattivatti</h1>
 </p>
 
-<em>hatti vatii</em> is a <em>latti</em>ce Boltzmann method solver for advection-diffusion-reaction equation.
+<em>hattivatti</em> is a <em>latti</em>ce Boltzmann method solver for advection-diffusion-reaction equation.
 
 # origin
 It is hard to believe that I've NOT decide to implement Lattice Boltzmann Method (LBM) as a poor pun on the project's name.
