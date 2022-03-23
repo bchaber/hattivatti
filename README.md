@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://github.com/bchaber/hattivatti/blob/main/logo.svg" height="256px" alt="A streamer. Or a hattifattener. Maybe a D2Q6 stencil?"/>
-  <h1>hattivatti</h1>Cancel changes
+  <h1>hattivatti</h1>
 </p>
 
 <em>hattivatti</em> is a <em>latti</em>ce Boltzmann method solver for advection-diffusion-reaction equation.
