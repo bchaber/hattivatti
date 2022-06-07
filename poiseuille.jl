@@ -1,17 +1,17 @@
 # physical input parameters
-const H = 1e-3 # channel height [m]
-const ν = 1e-6 # kinematic viscosity [m^2/s]
-const ρ = 1e+3 # density [kg/m^3]
-const g = 10.0 # gravity [m/s^2]
-const τ = 0.55 # relaxation time [1]
+const H = 1.00 # channel height [m]
+const ν = 1e-1 # kinematic viscosity [m^2/s]
+const ρ = 1e+0 # density [kg/m^3]
+const g = 0.8  # gravity [m/s^2]
+const τ = 0.8  # relaxation time [1]
 
 # derived parameters
 const um = ρ * g * H^2 / (8.0 * ρ * ν) # maximum velocity
 const Re = g * H^3 / (8.0 * ν^2)   # Reynolds number
 
 # simulation parameters
-const H̃ = 100
-const W̃ = 1
+const H̃ = 50
+const W̃ = 100
 const ρ̃ = 1.0 # arbitrary
 # primary conversion factors
 CH = H / H̃ # [m]
@@ -26,6 +26,7 @@ const g̃  = g / Cg
 const ν̃  = ν / Cν
 const ũm = um / Cu
 const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical one
+@assert ũm < 1.0
 
 using StaticArrays
 using Einsum
@@ -62,11 +63,11 @@ end
 
 function collide()
     for n in 1:H̃, m in 1:W̃
-        vy = τ * rho[n, m] * g̃
+        vy = τ * g̃ * rho[n, m]
         uu = ux[n, m]^2 + uy[n, m]^2 + vy^2
         
         for i in 1:Q
-            eu = (ex[i] * ux[n,m] +  ey[i] * uy[n,m] + ey[i] * vy)
+            eu = (ex[i] * ux[n,m] + ey[i] * uy[n,m] + ey[i] * vy)
             fi = f[n, m, i]
             feq = rho[n, m] * weights[i] *
                 (1. + 3. * eu + 4.5 * eu^2 - 1.5 * uu)
@@ -113,10 +114,5 @@ using BenchmarkTools
 using ProgressMeter
 using UnicodePlots
 
-@showprogress for t=1:100_000 step() end
-let 
-    println("Plotting...")
-    plt = Plot([0, H̃-1], [minimum(Cu * uy), maximum(Cu * uy)], nothing, BrailleCanvas; width=60, height=20)
-    plt = lineplot!(plt, 0:H̃-1, Cu * uy[:, 1], name="simulated")
-    show(plt)
-end
+@showprogress for t=1:22_500 step() end
+@show extrema(Cu * uy)
