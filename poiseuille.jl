@@ -62,11 +62,11 @@ function stream()
 end
 
 function collide()
-    for n in 1:H̃, m in 1:W̃
+    @inbounds for n in 1:H̃, m in 1:W̃
         vy = τ * g̃ * rho[n, m]
         uu = ux[n, m]^2 + uy[n, m]^2 + vy^2
         
-        for i in 1:Q
+        @inbounds for i in 1:Q
             eu = (ex[i] * ux[n,m] + ey[i] * uy[n,m] + ey[i] * vy)
             fi = f[n, m, i]
             feq = rho[n, m] * weights[i] *
@@ -79,19 +79,19 @@ function collide()
 end
 
 function boundary()
-    for n=1, m in 1:W̃, i in east
+    @inbounds for n=1, m in 1:W̃, i in east
         f′[n, m, i] = f[n, m, opposite[i]]
     end # bounce-back from east wall
 
-    for n=H̃, m in 1:W̃, i in west
+    @inbounds for n=H̃, m in 1:W̃, i in west
         f′[n, m, i] = f[n, m, opposite[i]]
     end # bounce-back from west wall
 
-    for n=1, m in 1:W̃, i in east
+    @inbounds for n=1, m in 1:W̃, i in east
         f[n, m, i] = f′[n, m, i]
     end
 
-    for n=H̃, m in 1:W̃, i in west
+    @inbounds for n=H̃, m in 1:W̃, i in west
         f[n, m, i] = f′[n, m, i]
     end
 
@@ -114,6 +114,12 @@ end
 using BenchmarkTools
 using ProgressMeter
 using UnicodePlots
+#=
+=#
+t = @belapsed step()
+MLUps = H̃ * W̃ / t * 1e-6
+@show MLUps
+
 #=
 @showprogress for t=1:500 step() end
 show(lineplot(Cu * view(uy, :, 5),
