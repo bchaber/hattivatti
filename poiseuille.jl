@@ -29,19 +29,18 @@ const ũm = um / Cu
 const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical one
 @assert ũm < 1.0 "Population moves MORE than one cell in a timestep"
 
-using StaticArrays
 using Einsum
 # constants
 const D        = 2 # spatial dimensions
 const Q        = 9 # discrete velocities 
-const ex       = @SVector[0, 1, 1, 0,-1,-1,-1, 0, 1]
-const ey       = @SVector[0, 0, 1, 1, 1, 0,-1,-1,-1]
-const west     = @SVector[2, 3, 9]
-const east     = @SVector[5, 6, 7]
-const north    = @SVector[3, 4, 5]
-const south    = @SVector[7, 8, 9]
-const weights  = @SVector[4/9,1/9,1/36,1/9,1/36,1/9,1/36,1/9,1/36]
-const opposite = @SVector[1, 6, 7, 8, 9, 2, 3, 4, 5]
+const ex       = [0, 1, 1, 0,-1,-1,-1, 0, 1]
+const ey       = [0, 0, 1, 1, 1, 0,-1,-1,-1]
+const west     = [2, 3, 9] # W, NW, SW
+const east     = [5, 6, 7] # NE, E, SE
+const north    = [3, 4, 5] # NW, N, NE
+const south    = [7, 8, 9] # SE, S, SW
+const weights  = [4/9,1/9,1/36,1/9,1/36,1/9,1/36,1/9,1/36]
+const opposite = [1, 6, 7, 8, 9, 2, 3, 4, 5]
 
 # populations on lattice (PDFs)
 const f  = ones(H̃, W̃, Q) / Q # normalized distribution
@@ -115,8 +114,9 @@ end
 using BenchmarkTools
 using ProgressMeter
 using UnicodePlots
-
+#=
 @showprogress for t=1:500 step() end
 show(lineplot(Cu * view(uy, :, 5),
               title="Physical y-velocity profile"))
 show(extrema(Cu * uy))
+=#
