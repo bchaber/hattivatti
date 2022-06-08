@@ -1,26 +1,26 @@
 # physical input parameters
-const H = 1.00 # channel height [m]
 const ν = 1e-1 # kinematic viscosity [m^2/s]
+const H = 1.00 # channel height [m]
 const ρ = 1e+0 # density [kg/m^3]
 const g = 0.8  # gravity [m/s^2]
-const τ = 0.8  # relaxation time [1]
 
 # derived parameters
 const um = g * H^2 / (8.0 * ν)    # maximum velocity [m/s]
 const Re = g * H^3 / (8.0 * ν^2)  # Reynolds number [1]
 
 # simulation parameters
-const H̃ = 50
-const W̃ = 100
-const ρ̃ = 1.0 # arbitrary
+const H̃ = 50   # height of the channel [l. u.]
+const W̃ = 100  # width of the channel [l. u.]
+const ρ̃ = 1.0  # average density [1]
+const τ = 0.8  # relaxation time [1]
 
-# primary conversion factors
-CH = H / H̃ # [m]
-Cρ = ρ / ρ̃ # [kg / m^3] 
-Ct = (τ - 0.5) / 3.0 * CH^2 / ν
-Cu = CH / Ct
-Cν = Cu * CH
-Cg = Cρ * CH / Ct^2
+# conversion factors
+CH = H / H̃                      # [m]
+Cρ = ρ / ρ̃                      # [kg / m^3] 
+Ct = (τ - 0.5) / 3.0 * CH^2 / ν # [s]
+Cu = CH / Ct                    # [m / s]
+Cν = Cu * CH                    # [?]
+Cg = Cρ * CH / Ct^2             # [?]
 
 # normalized parameters
 const g̃  = g / Cg
@@ -44,8 +44,8 @@ const weights  = @SVector[4/9,1/9,1/36,1/9,1/36,1/9,1/36,1/9,1/36]
 const opposite = @SVector[1, 6, 7, 8, 9, 2, 3, 4, 5]
 
 # populations on lattice (PDFs)
-const f  = ones(H̃, W̃, Q) / Q
-const f′ = similar(f) # post-collision distribution
+const f  = ones(H̃, W̃, Q) / Q # normalized distribution
+const f′ = similar(f)        # post-collision distribution
 
 # derived quantities on lattice
 const rho = zeros(H̃, W̃)
@@ -111,6 +111,7 @@ function step()
     return nothing
 end
 
+# simulation and post-processing
 using BenchmarkTools
 using ProgressMeter
 using UnicodePlots
