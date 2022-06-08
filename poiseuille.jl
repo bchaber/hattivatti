@@ -6,13 +6,14 @@ const g = 0.8  # gravity [m/s^2]
 const τ = 0.8  # relaxation time [1]
 
 # derived parameters
-const um = ρ * g * H^2 / (8.0 * ρ * ν) # maximum velocity
-const Re = g * H^3 / (8.0 * ν^2)   # Reynolds number
+const um = g * H^2 / (8.0 * ν)    # maximum velocity [m/s]
+const Re = g * H^3 / (8.0 * ν^2)  # Reynolds number [1]
 
 # simulation parameters
 const H̃ = 50
 const W̃ = 100
 const ρ̃ = 1.0 # arbitrary
+
 # primary conversion factors
 CH = H / H̃ # [m]
 Cρ = ρ / ρ̃ # [kg / m^3] 
@@ -26,7 +27,7 @@ const g̃  = g / Cg
 const ν̃  = ν / Cν
 const ũm = um / Cu
 const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical one
-@assert ũm < 1.0
+@assert ũm < 1.0 "Population moves MORE than one cell in a timestep"
 
 using StaticArrays
 using Einsum
@@ -44,7 +45,7 @@ const opposite = @SVector[1, 6, 7, 8, 9, 2, 3, 4, 5]
 
 # populations on lattice (PDFs)
 const f  = ones(H̃, W̃, Q) / Q
-const f′ = similar(f)
+const f′ = similar(f) # post-collision distribution
 
 # derived quantities on lattice
 const rho = zeros(H̃, W̃)
@@ -54,7 +55,7 @@ const uy  = zeros(H̃, W̃)
 const fi  = zeros(H̃, W̃)
 function stream()
     for i in 1:Q
-        fi .= f[:, :, i]
+        copyto!(fi,view(f, :, :, i))
         circshift!(view(f, :, :, i), fi, (ex[i], ey[i]))
     end
 
@@ -114,5 +115,7 @@ using BenchmarkTools
 using ProgressMeter
 using UnicodePlots
 
-@showprogress for t=1:22_500 step() end
-@show extrema(Cu * uy)
+@showprogress for t=1:500 step() end
+show(lineplot(Cu * view(uy, :, 5),
+              title="Physical y-velocity profile"))
+show(extrema(Cu * uy))
