@@ -109,11 +109,8 @@ end
 
 function init()
     @inbounds for n in 1:H̃, m in 1:W̃
-        uu = ux[n, m]^2 + uy[n, m]^2
         @inbounds for i in 1:Q
-            eu   = ex[i] * ux[n,m] + ey[i] * uy[n,m]
-            feq  = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
-            f[n, m, i] = feq
+            f[n, m, i] = weights[i] * ρ̃ 
         end
     end
 end
@@ -136,11 +133,7 @@ init()
 @showprogress for t=1:40_000
     step()
 end
-# visualize
-plt = lineplot(1:H̃, [um * (1.0 - (y/0.5H)^2) for y in range(-0.5H, +0.5H, length=H̃)])
-plt = lineplot!(plt, 1:H̃, view(Cu * uy, :, 5))
-show(plt)
-show(extrema(Cu * uy))
+@show maximum(Cu * uy)
 # benchmark
 t = @belapsed step()
 MLUps = H̃ * W̃ / t * 1e-6
