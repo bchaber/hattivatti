@@ -2,11 +2,11 @@
 const ν = 0.1 # kinematic viscosity [m^2/s]
 const H = 1.0 # channel height [m]
 const ρ = 1.0 # density [kg/m^3]
-const g = 0.8 # gravity [m/s^2]
-
+const a = 0.8 # gravity [m/s^2]
+const F = a*ρ # force per unit volume [N/m^3] 
 # derived parameters
-const um = g * H^2 / (8.0 * ν)    # maximum velocity [m/s]
-const Re = g * H^3 / (8.0 * ν^2)  # Reynolds number [1]
+const um = a * H^2 / (8.0 * ν)    # maximum velocity [m/s]
+const Re = a * H^3 / (8.0 * ν^2)  # Reynolds number [1]
 
 # simulation parameters
 const H̃  = 50  # height of the channel [l. u.]
@@ -15,6 +15,7 @@ const ρ̃  = 1.0 # average density [1]
 const τ̃  = 0.8 # relaxation time [1]
 const Δx̃ = 1.0 # assumed (not used)
 const Δt̃ = 1.0 # assumed (not used)
+const λ̃  = τ̃ * Δt̃
 
 # conversion factors
 CH = H / H̃                      # [m]
@@ -22,10 +23,10 @@ Cρ = ρ / ρ̃                      # [kg / m^3]
 Ct = (τ̃ - 0.5) / 3.0 * CH^2 / ν # [s]
 Cu = CH / Ct                    # [m / s]
 Cν = Cu * CH                    # [m^2 / s]
-Cg = Cρ * CH / Ct^2             # [kg / m^3 * m / s^2 = N / m^3]
+CF = Cρ * CH / Ct^2             # [kg / m^3 * m / s^2 = N / m^3]
 
 # normalized parameters
-const g̃  = g / Cg
+const F̃  = F / CF
 const ν̃  = ν / Cν
 const ũm = um / Cu
 const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical one
@@ -55,7 +56,6 @@ const ux  = zeros(H̃, W̃)
 const uy  = zeros(H̃, W̃)
 
 const fi  = zeros(H̃, W̃)
-
 function stream()
     @inbounds for i in 1:Q
         copyto!(fi,view(f, :, :, i))
@@ -66,23 +66,21 @@ function stream()
 end
 
 const ω̃ = 1.0 / τ̃
-function collide()
+function collide() # [Luo 1997]
     @inbounds for n in 1:H̃, m in 1:W̃
-        vy = τ̃ * g̃ * rho[n, m]
-        uu = ux[n, m]^2 + uy[n, m]^2 + vy^2
-        
+        uu = ux[n, m]^2 + uy[n, m]^2
         @inbounds for i in 1:Q
-            eu = (ex[i] * ux[n,m] + ey[i] * uy[n,m] + ey[i] * vy)
-            fi = f[n, m, i]
-            feq = rho[n, m] * weights[i] *
-                (1. + 3. * eu + 4.5 * eu^2 - 1.5 * uu)
-            f[n, m, i] -= ω̃ * (fi - feq)
+            eu   = ex[i] * ux[n,m] + ey[i] * uy[n,m]
+            feq  = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
+            fi   = f[n, m, i]
+            Si   = 3. * weights[i] * ey[i] * F̃
+            f[n, m, i] +=  ω̃ * (feq - fi)
+            f[n, m, i] += Δt̃ * Si
         end
     end
 
     return nothing
 end
-
 function boundary()
     @inbounds for n=1, m in 1:W̃, i in east
         f′[n, m, i] = f[n, m, opposite[i]]
@@ -103,14 +101,28 @@ function boundary()
     return nothing
 end
 
+function moments()
+    @einsum rho[n, m] = f[n, m, i]
+    @einsum ux[n, m]  = f[n, m, i] * ex[i] / rho[n, m]
+    @einsum uy[n, m]  = f[n, m, i] * ey[i] / rho[n, m]
+end
+
+function init()
+    @inbounds for n in 1:H̃, m in 1:W̃
+        uu = ux[n, m]^2 + uy[n, m]^2
+        @inbounds for i in 1:Q
+            eu   = ex[i] * ux[n,m] + ey[i] * uy[n,m]
+            feq  = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
+            f[n, m, i] = feq
+        end
+    end
+end
+
 function step()
     collide()
     stream()
     boundary()
-
-    @einsum rho[n, m] = f[n, m, i]
-    @einsum ux[n, m]  = f[n, m, i] * ex[i] / rho[n, m]
-    @einsum uy[n, m]  = f[n, m, i] * ey[i] / rho[n, m]
+    moments()
     
     return nothing
 end
@@ -119,15 +131,17 @@ end
 using BenchmarkTools
 using ProgressMeter
 using UnicodePlots
-#=
-=#
+# simulate
+init()
+@showprogress for t=1:40_000
+    step()
+end
+# visualize
+plt = lineplot(1:H̃, [um * (1.0 - (y/0.5H)^2) for y in range(-0.5H, +0.5H, length=H̃)])
+plt = lineplot!(plt, 1:H̃, view(Cu * uy, :, 5))
+show(plt)
+show(extrema(Cu * uy))
+# benchmark
 t = @belapsed step()
 MLUps = H̃ * W̃ / t * 1e-6
 @show MLUps
-
-#=
-@showprogress for t=1:500 step() end
-show(lineplot(Cu * view(uy, :, 5),
-              title="Physical y-velocity profile"))
-show(extrema(Cu * uy))
-=#
