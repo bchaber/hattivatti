@@ -57,7 +57,7 @@ const uy  = zeros(H̃, W̃)
 const fi  = zeros(H̃, W̃)
 
 function stream()
-    for i in 1:Q
+    @inbounds for i in 1:Q
         copyto!(fi,view(f, :, :, i))
         circshift!(view(f, :, :, i), fi, (ex[i], ey[i]))
     end
