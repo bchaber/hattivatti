@@ -30,6 +30,7 @@ const F̃  = F / CF
 const ν̃  = ν / Cν
 const ũm = um / Cu
 const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical one
+@assert R̃e ≈ Re  "Reynolds number should be preserved in lattice units"
 @assert ũm < 1.0 "Population moves MORE than one cell in a timestep"
 @assert ũm < 0.1 "The results might not be accurate"
 
@@ -58,8 +59,8 @@ const uy  = zeros(H̃, W̃)
 const fi  = zeros(H̃, W̃)
 function stream()
     @inbounds for i in 1:Q
-        copyto!(fi,view(f, :, :, i))
-        circshift!(view(f, :, :, i), fi, (ex[i], ey[i]))
+        copyto!(fi,view(f′, :, :, i))
+        circshift!(view(f,  :, :, i), fi, (ex[i], ey[i]))
     end
 
     return nothing
@@ -70,32 +71,23 @@ function collide() # [Luo 1997]
     @inbounds for n in 1:H̃, m in 1:W̃
         uu = ux[n, m]^2 + uy[n, m]^2
         @inbounds for i in 1:Q
-            eu   = ex[i] * ux[n,m] + ey[i] * uy[n,m]
-            feq  = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
-            fi   = f[n, m, i]
-            Si   = 3. * weights[i] * ey[i] * F̃
-            f[n, m, i] +=  ω̃ * (feq - fi)
-            f[n, m, i] += Δt̃ * Si
+            eu  = ex[i] * ux[n,m] + ey[i] * uy[n,m]
+            feq = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
+            fi  = f[n, m, i]
+            Si  = 3. * weights[i] * ey[i] * F̃
+            f′[n, m, i] = fi + ω̃ * (feq - fi) + Δt̃ * Si
         end
     end
 
     return nothing
 end
-function boundary()
-    @inbounds for n=1, m in 1:W̃, i in east
-        f′[n, m, i] = f[n, m, opposite[i]]
-    end # bounce-back from east wall
-
-    @inbounds for n=H̃, m in 1:W̃, i in west
-        f′[n, m, i] = f[n, m, opposite[i]]
-    end # bounce-back from west wall
-
-    @inbounds for n=1, m in 1:W̃, i in east
-        f[n, m, i] = f′[n, m, i]
+function bounceback()
+    @inbounds for n=1, m in 1:W̃, i in west
+        f[n, m, i] = f′[n, m, opposite[i]]
     end
 
-    @inbounds for n=H̃, m in 1:W̃, i in west
-        f[n, m, i] = f′[n, m, i]
+    @inbounds for n=H̃, m in 1:W̃, i in east
+        f[n, m, i] = f′[n, m, opposite[i]]
     end
 
     return nothing
@@ -116,10 +108,10 @@ function init()
 end
 
 function step()
+    moments()
     collide()
     stream()
-    boundary()
-    moments()
+    bounceback()
     
     return nothing
 end
@@ -130,7 +122,7 @@ using ProgressMeter
 using UnicodePlots
 # simulate
 init()
-@showprogress for t=1:40_000
+@showprogress for t=1:50_000
     step()
 end
 @show maximum(Cu * uy)
