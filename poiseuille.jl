@@ -97,6 +97,8 @@ function moments()
     @einsum rho[n, m] = f[n, m, i]
     @einsum ux[n, m]  = f[n, m, i] * ex[i] / rho[n, m]
     @einsum uy[n, m]  = f[n, m, i] * ey[i] / rho[n, m]
+
+    return nothing
 end
 
 function init()
@@ -105,6 +107,8 @@ function init()
             f[n, m, i] = weights[i] * ρ̃ 
         end
     end
+
+    return nothing
 end
 
 function step()
