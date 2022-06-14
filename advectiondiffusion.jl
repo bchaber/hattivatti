@@ -1,30 +1,33 @@
 # based on a C code (GaussianHill) from Alexandr Kuzmin
 # https://github.com/shurikkuzmin/LatticeBoltzmannMethod
 
-const NX = 80
-const NT = 20
-const xInit = 40 + 1
-const σ = 8
+const NX = 512
+const NT = 100
+const σ0 = 10.0 
+const Q = 3
+const f  = zeros(NX, Q) # population distribution
+const f′ = zeros(NX, Q) # post-collision distributio
+const rho = zeros(NX)   # 0-th moment
 
-
-const g = zeros(NX, 3)
-const g2= zeros(NX, 3)
-const phase = zeros(NX)
-
-const ux = 0.5
+const ũx = 0.0
 
 const weights = [2/3 1/6 1/6];
-const compliment =[1 3 2]
+const compliment = [1 3 2]
 const cx = [0 1 -1]
 
-const Λ = 1.0/6.0
-const ω =0.3
+const Λ = 1/6
+const τ = 5.0
+const ω = 1/τ
 
+rhos = zeros(NX, NT)
+function saverho(t)
+    rhos[:, t] .= rho
+end
 
-function writephase(fname)
+function writerho(fname)
     open(fname, "w") do f
-        for iX=1:NX
-            print(f, phase[iX], " ")
+        for n=1:NX
+            print(f, rho[n], " ")
         end
         println(f)
     end
@@ -33,91 +36,91 @@ function writephase(fname)
 end
 
 function gauss(dx)
-    return exp(-0.5*dx^2/σ^2)
+    return exp(-0.5*dx^2/σ0^2)
 end
 
 function init()
-    for iX=1:NX
-        if abs(iX - xInit) <= 3σ
-            phase[iX] = gauss(iX-xInit)
-        else
-            phase[iX] = 0.0
-        end
+    for n=1:NX
+        rho[n] = gauss(n - 200)
     end
     
-    for iX = 1:NX, k=1:3
-        g[iX, k] = weights[k]*phase[iX]*(1.0 + 3.0 * cx[k]*ux + 4.5 * (cx[k]*cx[k]-1.0/3.0)*ux*ux)
+    for n = 1:NX, i=1:Q
+        f[n, i] = weights[i]*rho[n]*(1.0 + 3.0 * cx[i]*ũx + 4.5 * (cx[i]^2 - 1/3)*ũx^2)
     end
     
     return nothing
 end
 
+function moments()
+    for n=1:NX
+        rho[n]=0.0
+        for i=1:Q
+            rho[n]+=f[n, i]
+        end
+    end
+
+    return nothing
+end
+
+const g⁺   = zeros(Q)
+const g⁻   = zeros(Q)
+const geq  = zeros(Q)
+const geq⁺ = zeros(Q)
+const geq⁻ = zeros(Q)  
 function collide()
-    for iX=1:NX
-        phase[iX]=0.0;
-        for iPop=1:3
-            phase[iX]+=g[iX, iPop]
-        end
-    end
-    
-    for iX=1:NX
-        g_plus    = zeros(3)
-        g_minus   = zeros(3)
-        geq       = zeros(3)
-        geq_plus  = zeros(3)
-        geq_minus = zeros(3)  
+    for n=1:NX
         
-        for k=1:3
-            g_plus[k]  = 0.5*(g[iX, k]+g[iX, compliment[k]])
-            g_minus[k] = 0.5*(g[iX, k]-g[iX, compliment[k]])
+        for i=1:Q
+            g⁺[i] = 0.5*(f[n, i] + f[n, compliment[i]])
+            g⁻[i] = 0.5*(f[n, i] - f[n, compliment[i]])
         end
         
-        for k=1:3
-            geq[k]=weights[k]*phase[iX]*(1.0+3.0*cx[k]*ux+4.5*(cx[k]*cx[k]-1.0/3.0)*ux*ux);			
+        for i=1:Q
+            geq[i] = weights[i]*rho[n]*(1.0+3.0*cx[i]*ũx+4.5*(cx[i]^2 - 1/3)*ũx^2);			
         end
         
         
-        for k=1:3
-            geq_plus[k]  = 0.5*(geq[k]+geq[compliment[k]]);
-            geq_minus[k] = 0.5*(geq[k]-geq[compliment[k]]);
+        for i=1:Q
+            geq⁺[i] = 0.5*(geq[i] + geq[compliment[i]]);
+            geq⁻[i] = 0.5*(geq[i] - geq[compliment[i]]);
         end
         
-        ω_minus_phase = 1.0/(Λ/(1.0/ω-0.5)+0.5);
-        ω_plus_phase  = 1.0/(Λ/(1.0/ω-0.5)+0.5);
+        ω_minus_rho = 1.0/(Λ/(1.0/ω-0.5)+0.5)
+        ω_plus_rho  = ω
         
-        for k=1:3
-            g2[iX, k] = g[iX, k]-ω_plus_phase*(g_plus[k]-geq_plus[k])-ω_minus_phase*(g_minus[k]-geq_minus[k]);
+        for i=1:Q
+            f′[n, i] = f[n, i] - ω_plus_rho*(g⁺[i]-geq⁺[i]) - ω_minus_rho*(g⁻[i]-geq⁻[i]);
         end
     end
     
     return nothing
 end
 
+fi = zeros(NX)
 function stream()
-    for iX=1:NX
-        for iPop=1:3
-            iX2 = (iX - cx[iPop] + NX) % NX + 1;
-            g[iX, iPop] = g2[iX2, iPop];
-        end
+    @inbounds for i in 1:Q
+        copyto!(fi,view(f′, :, i))
+        circshift!(view(f,  :, i), fi, (cx[i]))
     end
+    return nothing
 end
 
 function main()
-    for t=0:NT
+    init()
+    for t=1:NT
+	    moments()
         collide()
         stream()
-        if t % 10 == 0
-            writephase("phase$t.dat")
-        end
+        saverho(t)
     end
     println("done.")
     return 0;
 end
 
 using UnicodePlots
-plt = lineplot([gauss(dx) for dx = -30:+50], name="analytical")
+plt = lineplot([gauss(n - 200) for n in 1:NX], name="analytical")
 init()
-plt = lineplot!(plt, phase, name="initial")
+plt = lineplot!(plt, rho, name="initial")
 main()
-plt = lineplot!(plt, phase, name="final")
+plt = lineplot!(plt, rho, name="final")
 show(plt)
