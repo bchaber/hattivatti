@@ -2,38 +2,31 @@
 #const ν = 0.1 # kinematic viscosity [m^2/s]
 const H  = 1.0 # channel height [m]
 const ρ  = 1.0 # density [kg/m^3]
-#const um = NaN # maximum velocity [m/s]
+const D  = 1.5 # diffiusion [m^2/s]
 # derived parameters
-const Re = NaN # Reynolds number [1]
+const τg = 3.0D + 1/2
 
 # simulation parameters
 const H̃  = 512 # height of the channel [l. u.]
 const W̃  = 512 # width of the channel [l. u.]
 const ρ̃  = 1.0 # average density [1]
-const τ̃  = 0.513 # relaxation time [1]
 const σ0 = 10. # initial width [1]
 const Δx̃ = 1.0 # assumed (not used)
 const Δt̃ = 1.0 # assumed (not used)
-const λ̃  = τ̃ * Δt̃
+const τ̃  = τg/Δt̃ # relaxation time [1]
+const λ̃  = τg
 
 # conversion factors
 CH = H / H̃                      # [m]
 Cρ = ρ / ρ̃                      # [kg / m^3] 
-#Ct = (τ̃ - 0.5) / 3.0 * CH^2 / ν # [s]
-#Cu = CH / Ct                    # [m / s]
-#Cν = Cu * CH                    # [m^2 / s]
 
 # normalized parameters
-#const ν̃  = ν / Cν
-const ũ = 0.1
-#const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical one
-#@assert R̃e ≈ Re  "Reynolds number should be preserved in lattice units"
-#@assert ũm < 1.0 "Population moves MORE than one cell in a timestep"
-#@assert ũm < 0.1 "The results might not be accurate"
+const ũ = 0.0
+@assert ũ < 1.0 "Population moves MORE than one cell in a timestep"
 
 using Einsum
 # constants
-const D        = 2 # spatial dimensions
+#const D       = 2 # spatial dimensions
 const Q        = 9 # discrete velocities 
 const ex       = [0, 1, 1, 0,-1,-1,-1, 0, 1]
 const ey       = [0, 0, 1, 1, 1, 0,-1,-1,-1]
@@ -48,6 +41,8 @@ const opposite = [1, 6, 7, 8, 9, 2, 3, 4, 5]
 # populations on lattice (PDFs)
 const f  = ones(H̃, W̃, Q) * ρ / Q # normalized distribution
 const f′ = similar(f)        # post-collision distribution
+const ux = [ũ for n=1:H̃, m=1:W̃]
+const uy = [ũ for n=1:H̃, m=1:W̃]
 # derived, physical quantities on lattice
 const rho = ones(H̃, W̃) * ρ
 
@@ -64,9 +59,9 @@ end
 const ω̃ = 1.0 / τ̃
 function collide() # [Luo 1997]
     @inbounds for n in 1:H̃, m in 1:W̃
-        uu = ũ^2 + ũ^2
+        uu = ux[n,m]^2 + uy[n,m]^2
         @inbounds for i in 1:Q
-            eu  = ex[i] * ũ + ey[i] * ũ
+            eu  = ex[i] * ux[n, m] + ey[i] * uy[n, m]
             feq = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
             fi  = f[n, m, i]
             Si  = 0.0
@@ -117,7 +112,7 @@ init()
 @showprogress for t=1:200
     step()
 end
-#@show maximum(Cu * uy)
+@show findmax(rho)
 # benchmark
 #t = @belapsed step()
 #MLUps = H̃ * W̃ / t * 1e-6
