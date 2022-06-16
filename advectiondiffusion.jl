@@ -1,36 +1,84 @@
-# based on a C code (GaussianHill) from Alexandr Kuzmin
-# https://github.com/shurikkuzmin/LatticeBoltzmannMethod
+# physical input parameters
+#const ν = 0.1 # kinematic viscosity [m^2/s]
+const H  = 1.0 # channel height [m]
+const ρ  = 1.0 # density [kg/m^3]
+#const um = NaN # maximum velocity [m/s]
+# derived parameters
+const Re = NaN # Reynolds number [1]
 
-const NX = 512
-const NT = 100
-const σ0 = 10.0 
-const Q = 3
-const f  = zeros(NX, Q) # population distribution
-const f′ = zeros(NX, Q) # post-collision distributio
-const rho = zeros(NX)   # 0-th moment
+# simulation parameters
+const H̃  = 512 # height of the channel [l. u.]
+const W̃  = 512 # width of the channel [l. u.]
+const ρ̃  = 1.0 # average density [1]
+const τ̃  = 0.513 # relaxation time [1]
+const σ0 = 10. # initial width [1]
+const Δx̃ = 1.0 # assumed (not used)
+const Δt̃ = 1.0 # assumed (not used)
+const λ̃  = τ̃ * Δt̃
 
-const ũx = 0.0
+# conversion factors
+CH = H / H̃                      # [m]
+Cρ = ρ / ρ̃                      # [kg / m^3] 
+#Ct = (τ̃ - 0.5) / 3.0 * CH^2 / ν # [s]
+#Cu = CH / Ct                    # [m / s]
+#Cν = Cu * CH                    # [m^2 / s]
 
-const weights = [2/3 1/6 1/6];
-const compliment = [1 3 2]
-const cx = [0 1 -1]
+# normalized parameters
+#const ν̃  = ν / Cν
+const ũ = 0.1
+#const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical one
+#@assert R̃e ≈ Re  "Reynolds number should be preserved in lattice units"
+#@assert ũm < 1.0 "Population moves MORE than one cell in a timestep"
+#@assert ũm < 0.1 "The results might not be accurate"
 
-const Λ = 1/6
-const τ = 5.0
-const ω = 1/τ
+using Einsum
+# constants
+const D        = 2 # spatial dimensions
+const Q        = 9 # discrete velocities 
+const ex       = [0, 1, 1, 0,-1,-1,-1, 0, 1]
+const ey       = [0, 0, 1, 1, 1, 0,-1,-1,-1]
+const west     = [2, 3, 9] # W, NW, SW
+const east     = [5, 6, 7] # NE, E, SE
+const north    = [3, 4, 5] # NW, N, NE
+const south    = [7, 8, 9] # SE, S, SW
+const weights  = [4/9,1/9,1/36,1/9,1/36,1/9,1/36,1/9,1/36]
+const opposite = [1, 6, 7, 8, 9, 2, 3, 4, 5]
 
-rhos = zeros(NX, NT)
-function saverho(t)
-    rhos[:, t] .= rho
+## initial conditions
+# populations on lattice (PDFs)
+const f  = ones(H̃, W̃, Q) * ρ / Q # normalized distribution
+const f′ = similar(f)        # post-collision distribution
+# derived, physical quantities on lattice
+const rho = ones(H̃, W̃) * ρ
+
+const fi  = zeros(H̃, W̃)
+function stream()
+    @inbounds for i in 1:Q
+        copyto!(fi,view(f′, :, :, i))
+        circshift!(view(f,  :, :, i), fi, (ex[i], ey[i]))
+    end
+
+    return nothing
 end
 
-function writerho(fname)
-    open(fname, "w") do f
-        for n=1:NX
-            print(f, rho[n], " ")
+const ω̃ = 1.0 / τ̃
+function collide() # [Luo 1997]
+    @inbounds for n in 1:H̃, m in 1:W̃
+        uu = ũ^2 + ũ^2
+        @inbounds for i in 1:Q
+            eu  = ex[i] * ũ + ey[i] * ũ
+            feq = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
+            fi  = f[n, m, i]
+            Si  = 0.0
+            f′[n, m, i] = fi + ω̃ * (feq - fi) + Δt̃ * Si
         end
-        println(f)
     end
+
+    return nothing
+end
+
+function moments()
+    @einsum rho[n, m] = f[n, m, i]
     
     return nothing
 end
@@ -40,87 +88,37 @@ function gauss(dx)
 end
 
 function init()
-    for n=1:NX
-        rho[n] = gauss(n - 200)
-    end
-    
-    for n = 1:NX, i=1:Q
-        f[n, i] = weights[i]*rho[n]*(1.0 + 3.0 * cx[i]*ũx + 4.5 * (cx[i]^2 - 1/3)*ũx^2)
-    end
-    
-    return nothing
-end
-
-function moments()
-    for n=1:NX
-        rho[n]=0.0
-        for i=1:Q
-            rho[n]+=f[n, i]
+    @inbounds for n in 1:H̃, m in 1:W̃
+        rho[n, m] = gauss(n - 200) * gauss(m - 200)
+        uu = ũ^2 + ũ^2
+        @inbounds for i in 1:Q
+            eu  = ex[i] * ũ + ey[i] * ũ
+            f[n, m, i] = weights[i] * ρ̃ * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
         end
     end
 
     return nothing
 end
 
-const g⁺   = zeros(Q)
-const g⁻   = zeros(Q)
-const geq  = zeros(Q)
-const geq⁺ = zeros(Q)
-const geq⁻ = zeros(Q)  
-function collide()
-    for n=1:NX
-        
-        for i=1:Q
-            g⁺[i] = 0.5*(f[n, i] + f[n, compliment[i]])
-            g⁻[i] = 0.5*(f[n, i] - f[n, compliment[i]])
-        end
-        
-        for i=1:Q
-            geq[i] = weights[i]*rho[n]*(1.0+3.0*cx[i]*ũx+4.5*(cx[i]^2 - 1/3)*ũx^2);			
-        end
-        
-        
-        for i=1:Q
-            geq⁺[i] = 0.5*(geq[i] + geq[compliment[i]]);
-            geq⁻[i] = 0.5*(geq[i] - geq[compliment[i]]);
-        end
-        
-        ω_minus_rho = 1.0/(Λ/(1.0/ω-0.5)+0.5)
-        ω_plus_rho  = ω
-        
-        for i=1:Q
-            f′[n, i] = f[n, i] - ω_plus_rho*(g⁺[i]-geq⁺[i]) - ω_minus_rho*(g⁻[i]-geq⁻[i]);
-        end
-    end
+function step()
+    moments()
+    collide()
+    stream()
     
     return nothing
 end
 
-fi = zeros(NX)
-function stream()
-    @inbounds for i in 1:Q
-        copyto!(fi,view(f′, :, i))
-        circshift!(view(f,  :, i), fi, (cx[i]))
-    end
-    return nothing
-end
-
-function main()
-    init()
-    for t=1:NT
-	    moments()
-        collide()
-        stream()
-        saverho(t)
-    end
-    println("done.")
-    return 0;
-end
-
+# simulation and post-processing
+using BenchmarkTools
+using ProgressMeter
 using UnicodePlots
-plt = lineplot([gauss(n - 200) for n in 1:NX], name="analytical")
+# simulate
 init()
-plt = lineplot!(plt, rho, name="initial")
-main()
-plt = lineplot!(plt, rho, name="final")
-show(plt)
+@showprogress for t=1:200
+    step()
+end
+#@show maximum(Cu * uy)
+# benchmark
+#t = @belapsed step()
+#MLUps = H̃ * W̃ / t * 1e-6
+#@show MLUps
