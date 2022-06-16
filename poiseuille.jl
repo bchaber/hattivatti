@@ -10,7 +10,7 @@ const Re = a * H^3 / (8.0 * ν^2)  # Reynolds number [1]
 
 # simulation parameters
 const H̃  = 50  # height of the channel [l. u.]
-const W̃  = 100 # width of the channel [l. u.]
+const W̃  = 1   # width of the channel [l. u.]
 const ρ̃  = 1.0 # average density [1]
 const τ̃  = 0.8 # relaxation time [1]
 const Δx̃ = 1.0 # assumed (not used)
