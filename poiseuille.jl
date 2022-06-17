@@ -9,6 +9,7 @@ const um = a * H^2 / (8.0 * ν)    # maximum velocity [m/s]
 const Re = a * H^3 / (8.0 * ν^2)  # Reynolds number [1]
 
 # simulation parameters
+const NT = 50_000 # number of timesteps [1]
 const H̃  = 50  # height of the channel [l. u.]
 const W̃  = 1   # width of the channel [l. u.]
 const ρ̃  = 1.0 # average density [1]
@@ -120,17 +121,6 @@ function step()
     return nothing
 end
 
-# simulation and post-processing
-using BenchmarkTools
-using ProgressMeter
-using UnicodePlots
-# simulate
-init()
-@showprogress for t=1:50_000
-    step()
+function evaluate()
+    @show maximum(Cu * uy)
 end
-@show maximum(Cu * uy)
-# benchmark
-t = @belapsed step()
-MLUps = H̃ * W̃ / t * 1e-6
-@show MLUps
