@@ -7,6 +7,7 @@ const D  = 1.5 # diffiusion [m^2/s]
 const τg = 3.0D + 1/2
 
 # simulation parameters
+const NT = 200 # number of timesteps [1]
 const H̃  = 512 # height of the channel [l. u.]
 const W̃  = 512 # width of the channel [l. u.]
 const ρ̃  = 1.0 # average density [1]
@@ -24,9 +25,7 @@ Cρ = ρ / ρ̃                      # [kg / m^3]
 const ũ = 0.0
 @assert ũ < 1.0 "Population moves MORE than one cell in a timestep"
 
-using Einsum
 # constants
-#const D       = 2 # spatial dimensions
 const Q        = 9 # discrete velocities 
 const ex       = [0, 1, 1, 0,-1,-1,-1, 0, 1]
 const ey       = [0, 0, 1, 1, 1, 0,-1,-1,-1]
@@ -72,6 +71,7 @@ function collide() # [Luo 1997]
     return nothing
 end
 
+using Einsum
 function moments()
     @einsum rho[n, m] = f[n, m, i]
     
@@ -103,17 +103,7 @@ function step()
     return nothing
 end
 
-# simulation and post-processing
-using BenchmarkTools
-using ProgressMeter
-using UnicodePlots
-# simulate
-init()
-@showprogress for t=1:200
-    step()
+function evaluate()
+    @show findmax(rho)
+    @show C0 = σ0^2 / (σ0^2 + 2.0D * 200)
 end
-@show findmax(rho)
-# benchmark
-#t = @belapsed step()
-#MLUps = H̃ * W̃ / t * 1e-6
-#@show MLUps
