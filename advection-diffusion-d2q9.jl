@@ -1,10 +1,9 @@
 # physical input parameters
-#const ν = 0.1 # kinematic viscosity [m^2/s]
-const H  = 1.0 # channel height [m]
-const ρ  = 1.0 # density [kg/m^3]
-const D  = 1.5 # diffiusion [m^2/s]
+const H = 1.0 # channel height [m]
+const ρ = 1.0 # density [kg/m^3]
+const D = 1.5 # diffiusion [m^2/s]
 # derived parameters
-const τg = 3.0D + 1/2
+const τg = 3.0D + 0.5
 
 # simulation parameters
 const NT = 200 # number of timesteps [1]
@@ -15,7 +14,8 @@ const σ0 = 10. # initial width [1]
 const Δx̃ = 1.0 # assumed (not used)
 const Δt̃ = 1.0 # assumed (not used)
 const τ̃  = τg/Δt̃ # relaxation time [1]
-const λ̃  = τg
+const ω̃  = 1.0/τ̃  # collision frequency [1]
+const λ̃  = τ̃
 
 # conversion factors
 CH = H / H̃                      # [m]
@@ -39,7 +39,7 @@ const opposite = [1, 6, 7, 8, 9, 2, 3, 4, 5]
 ## initial conditions
 # populations on lattice (PDFs)
 const f  = ones(H̃, W̃, Q) * ρ / Q # normalized distribution
-const f′ = similar(f)        # post-collision distribution
+const f′ = similar(f)            # post-collision distribution
 const ux = [ũ for n=1:H̃, m=1:W̃]
 const uy = [ũ for n=1:H̃, m=1:W̃]
 # derived, physical quantities on lattice
@@ -55,10 +55,12 @@ function stream()
     return nothing
 end
 
-const ω̃ = 1.0 / τ̃
-function collide() # [Luo 1997]
+"""
+Implements [Luo 1997] with Single-Time-Relaxation
+"""
+function collide()
     @inbounds for n in 1:H̃, m in 1:W̃
-        uu = ux[n,m]^2 + uy[n,m]^2
+        uu = ux[n, m]^2 + uy[n, m]^2
         @inbounds for i in 1:Q
             eu  = ex[i] * ux[n, m] + ey[i] * uy[n, m]
             feq = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)

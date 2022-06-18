@@ -1,7 +1,7 @@
 # physical input parameters
-const ν = 0.1 # kinematic viscosity [m^2/s]
 const H = 1.0 # channel height [m]
 const ρ = 1.0 # density [kg/m^3]
+const ν = 0.1 # kinematic viscosity [m^2/s]
 const a = 0.8 # gravity [m/s^2]
 const F = a*ρ # force per unit volume [N/m^3] 
 # derived parameters
@@ -13,10 +13,11 @@ const NT = 50_000 # number of timesteps [1]
 const H̃  = 50  # height of the channel [l. u.]
 const W̃  = 1   # width of the channel [l. u.]
 const ρ̃  = 1.0 # average density [1]
-const τ̃  = 0.8 # relaxation time [1]
 const Δx̃ = 1.0 # assumed (not used)
 const Δt̃ = 1.0 # assumed (not used)
-const λ̃  = τ̃ * Δt̃
+const τ̃  = 0.8 # relaxation time [1]
+const ω̃  = 1.0/τ̃ # collision frequency [1]
+const λ̃  = τ̃
 
 # conversion factors
 CH = H / H̃                      # [m]
@@ -35,9 +36,7 @@ const R̃e = ũm * H̃ / ν̃ # normalized Reynolds number matches the physical
 @assert ũm < 1.0 "Population moves MORE than one cell in a timestep"
 @assert ũm < 0.1 "The results might not be accurate"
 
-using Einsum
 # constants
-const D        = 2 # spatial dimensions
 const Q        = 9 # discrete velocities 
 const ex       = [0, 1, 1, 0,-1,-1,-1, 0, 1]
 const ey       = [0, 0, 1, 1, 1, 0,-1,-1,-1]
@@ -51,7 +50,7 @@ const opposite = [1, 6, 7, 8, 9, 2, 3, 4, 5]
 ## initial conditions
 # populations on lattice (PDFs)
 const f  = ones(H̃, W̃, Q) * ρ / Q # normalized distribution
-const f′ = similar(f)        # post-collision distribution
+const f′ = similar(f)            # post-collision distribution
 # derived, physical quantities on lattice
 const rho = ones(H̃, W̃) * ρ
 const ux  = zeros(H̃, W̃)
@@ -67,12 +66,14 @@ function stream()
     return nothing
 end
 
-const ω̃ = 1.0 / τ̃
-function collide() # [Luo 1997]
+"""
+Implements [Luo 1997] with Single-Time-Relaxation
+"""
+function collide()
     @inbounds for n in 1:H̃, m in 1:W̃
         uu = ux[n, m]^2 + uy[n, m]^2
         @inbounds for i in 1:Q
-            eu  = ex[i] * ux[n,m] + ey[i] * uy[n,m]
+            eu  = ex[i] * ux[n, m] + ey[i] * uy[n, m]
             feq = weights[i] * rho[n, m] * (1. + 3. * eu + 9/2 * eu^2 - 3/2 * uu)
             fi  = f[n, m, i]
             Si  = 3. * weights[i] * ey[i] * F̃
@@ -82,6 +83,7 @@ function collide() # [Luo 1997]
 
     return nothing
 end
+
 function bounceback()
     @inbounds for n=1, m in 1:W̃, i in west
         f[n, m, i] = f′[n, m, opposite[i]]
@@ -94,6 +96,7 @@ function bounceback()
     return nothing
 end
 
+using Einsum
 function moments()
     @einsum rho[n, m] = f[n, m, i]
     @einsum ux[n, m]  = f[n, m, i] * ex[i] / rho[n, m]
