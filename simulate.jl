@@ -1,11 +1,13 @@
 using ProgressMeter
-include(first(ARGS))
 
-init()
-@showprogress for t=1:NT
+function simulate(timesteps)
+  init()
+  @showprogress for t=1:timesteps
     step()
+  end
+  evaluate()
+  return nothing
 end
-evaluate()
 
 """ Useful relations
 

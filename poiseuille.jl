@@ -1,3 +1,5 @@
+using StaticArrays
+
 # physical input parameters
 const H = 1.0 # channel height [m]
 const ρ = 1.0 # density [kg/m^3]
@@ -47,16 +49,18 @@ const south    = [7, 8, 9] # SE, S, SW
 const weights  = [4/9,1/9,1/36,1/9,1/36,1/9,1/36,1/9,1/36]
 const opposite = [1, 6, 7, 8, 9, 2, 3, 4, 5]
 
+sones(sz...)  = SizedArray{Tuple{sz...}}(ones(sz...))
+szeros(sz...) = SizedArray{Tuple{sz...}}(zeros(sz...))
 ## initial conditions
 # populations on lattice (PDFs)
-const f  = ones(H̃, W̃, Q) * ρ / Q # normalized distribution
+const f  = sones(H̃, W̃, Q) * ρ / Q # normalized distribution
 const f′ = similar(f)            # post-collision distribution
 # derived, physical quantities on lattice
-const rho = ones(H̃, W̃) * ρ
-const ux  = zeros(H̃, W̃)
-const uy  = zeros(H̃, W̃)
+const rho = sones(H̃, W̃) * ρ
+const ux  = szeros(H̃, W̃)
+const uy  = szeros(H̃, W̃)
 
-const fi  = zeros(H̃, W̃)
+const fi  = szeros(H̃, W̃)
 function stream()
     @inbounds for i in 1:Q
         copyto!(fi,view(f′, :, :, i))
@@ -96,11 +100,11 @@ function bounceback()
     return nothing
 end
 
-using Einsum
+using Tullio
 function moments()
-    @einsum rho[n, m] = f[n, m, i]
-    @einsum ux[n, m]  = f[n, m, i] * ex[i] / rho[n, m]
-    @einsum uy[n, m]  = f[n, m, i] * ey[i] / rho[n, m]
+    @tullio rho[n, m] = f[n, m, i]
+    @tullio ux[n, m]  = f[n, m, i] * ex[i] / rho[n, m]
+    @tullio uy[n, m]  = f[n, m, i] * ey[i] / rho[n, m]
 
     return nothing
 end
@@ -127,3 +131,6 @@ end
 function evaluate()
     @show maximum(Cu * uy)
 end
+
+include("benchmark.jl")
+benchmark()
